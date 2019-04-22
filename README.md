@@ -1,2 +1,2 @@
 # esc
-A Javascript Entity-System-Component Framework
+A Javascript Entity-Component-System Framework
