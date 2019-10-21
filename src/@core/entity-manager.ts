@@ -1,5 +1,5 @@
-import Entity from './entity';
-import { hook } from './hook';
+import { Entity } from './entity';
+import { hook } from './game-hook';
 
 class EntityManager {
   /**

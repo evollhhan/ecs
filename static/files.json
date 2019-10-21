@@ -1,0 +1,143 @@
+[
+  {
+    "filename": "@core",
+    "dir": true,
+    "children": [
+      {
+        "filename": "component.ts",
+        "lang": "typescript",
+        "data": "export interface IComponent {\n  /** 组件名称 */\n  name: string;\n}"
+      },
+      {
+        "filename": "const.ts",
+        "lang": "typescript",
+        "data": "export const ECS_STATUS = {\n  STOPPED: 'ecs_status_stopped',\n  RUNNING: 'ecs_status_running',\n  PAUSED:  'ecs_status_paused'\n}\n\nexport const ENTITY_EVENTS = {\n  ADD: 'ecs_entity_add',\n  REMOVE: 'ecs_entity_remove'\n}"
+      },
+      {
+        "filename": "entity-manager.ts",
+        "lang": "typescript",
+        "data": "import { Entity } from './entity';\nimport { hook } from './game-hook';\n\nclass EntityManager {\n  /**\n   * 实体列表\n   */\n  public entities: Entity[] = [];\n\n  /**\n   * 索引列表\n   */\n  private indexList: {\n    [index: string]: Entity[]\n  } = Object.create(null);\n\n  /**\n   * 获取实体\n   * @param id 实体ID\n   */\n  get (id: string): Entity | undefined {\n    return this.entities.find(e => e.id === id);\n  }\n\n  /**\n   * 搜索所有ID包含关键词的实体\n   * @param key 搜索词\n   */\n  search (key: string): Entity[] {\n    const result: Entity[] = [];\n    this.entities.forEach(e => {\n      if (e.id.indexOf(key) > -1) {\n        result.push(e);\n      }\n    })\n    return result;\n  }\n\n  /**\n   * 添加实体\n   * @param entity 实体\n   */\n  add (entity: Entity) {\n    this.entities.push(entity);\n  }\n\n  /**\n   * 按照一定规则生成过滤索引名\n   * @param filter 过滤器\n   */\n  getIndexName (filter: string[]): string {\n    return filter.sort().join(',') + ','\n  }\n\n\n  /**\n   * 获取索引列表\n   * @param key 过滤器，通过getIndexName生成\n   */\n  getIndexList (key: string): Entity[] {\n    if (!this.indexList[key]) {\n      this.indexList[key] = [];\n    }\n    return this.indexList[key];\n  }\n\n  /**\n   * 当某个Entity的组件列表发生变化时，更新索引列表\n   * @param action 添加 | 删除组件\n   * @param entity Entity\n   * @param componentName 组件名称\n   */\n  updateIndexList (action: 'add' | 'remove', entity: Entity, componentName: string) {\n    for (let key in this.indexList) {\n      if (key.indexOf(componentName) > -1) {\n        const list = this.indexList[key];\n        switch (action) {\n          case 'add':\n            if (this.matchIndex(key, entity.getComponentNames())) {\n              list.push(entity);\n              hook.emit(key, action, entity);\n            }\n            break;\n          case 'remove':\n            const index = list.indexOf(entity);\n            if (index > -1) {\n              list.splice(index, 1);\n              hook.emit(key, action, entity);\n            }\n            break;\n        }\n      }\n    }\n  }\n\n\n  /**\n   * 匹配某个Entity是否属于索引\n   * @param indexName\n   * @param componentNameList\n   */\n  private matchIndex (indexName: string, componentNameList: string[]): boolean {\n    const indexList = indexName.substr(0, indexName.length - 1).split(',');\n    const count = indexList.length;\n    let matched = false;\n    let checked = 0;\n    componentNameList.some(componentName => {\n      if (componentName === indexList[checked]) {\n        checked ++;\n      }\n      if (count === checked) {\n        matched = true;\n        return true;\n      } else {\n        return false;\n      }\n    })\n    return matched;\n  }\n}\n\nexport default new EntityManager();\n"
+      },
+      {
+        "filename": "entity.ts",
+        "lang": "typescript",
+        "data": "import { IComponent } from './component';\nimport entityManager from './entity-manager';\nimport { hook } from './game-hook';\nimport { ENTITY_EVENTS } from './const';\n\ntype TComponentList = {\n  [index: string]: IComponent | any;\n}\n\nexport interface IEntity<T> extends Entity {\n  component: T;\n}\n\nexport class Entity {\n  public id: string;\n  public component: TComponentList = Object.create(null);\n  public children: Entity[] = [];\n  \n  /**\n   * @param id 实体ID\n   */\n  constructor (id: string) {\n    this.id = id;\n  }\n\n  add (entity: Entity) {\n    this.children.push(entity);\n    hook.emit(ENTITY_EVENTS.ADD, this, entity);\n  }\n\n  remove (entity: Entity) {\n    this.children = this.children.filter(e => e !== entity);\n    hook.emit(ENTITY_EVENTS.REMOVE, this, entity);\n  }\n\n  getComponentNames (): string[] {\n    return Object.keys(this.component).sort();\n  }\n\n  getComponent<T> (componentName: string): T | null | undefined {\n    return this.component[componentName];\n  }\n\n  addComponent (component: IComponent) {\n    this.component[component.name] = component;\n    entityManager.updateIndexList('add', this, component.name);\n  }\n\n  removeComponent (component: IComponent) {\n    delete this.component[component.name];\n    entityManager.updateIndexList('remove', this, component.name);\n  }\n}"
+      },
+      {
+        "filename": "game-hook.ts",
+        "lang": "typescript",
+        "data": "/**\n * 事件原型\n */\nexport class EventEmitter {\n  protected evts: {\n    [index: string]: any[]\n  } = Object.create(null);\n\n  on (evtName: string, handler: any) {\n    if (!this.evts[evtName]) {\n      this.evts[evtName] = [];\n    }\n    this.evts[evtName].push(handler);\n  }\n\n  off (evtName: string, handler: any) {\n    if (!this.evts[evtName]) return;\n    this.evts[evtName] = this.evts[evtName].filter(h => h !== handler);\n  }\n\n  emit (evtName: string, ...args: any[]) {\n    const list = this.evts[evtName];\n    list && list.forEach(h => h(...args));\n  }\n}\n\n/**\n * 事件总线\n */\nexport const hook = new EventEmitter();\n"
+      },
+      {
+        "filename": "game-loop.ts",
+        "lang": "typescript",
+        "data": "export default class GameLoop {\n  /**\n   * 逻辑调用栈\n   */\n  private stack: any[] = [];\n  /**\n   * 是否正在运行\n   */\n  public running: boolean = false;\n\n  /**\n   * 添加任务\n   * @param cb\n   */\n  add (cb: any) {\n    this.stack.push(cb);\n  }\n\n  /**\n   * 移除任务\n   * @param cb\n   */\n  remove (cb: any) {\n    const idx = this.stack.indexOf(cb);\n    if (idx > -1) {\n      this.stack.splice(idx, 1);\n    }\n  }\n\n  /**\n   * 开始循环\n   */\n  start () {\n    this.running = true;\n  }\n\n  /**\n   * 结束循环\n   */\n  stop () {\n    this.running = false;\n  }\n\n  /**\n   * 执行循环\n   * @param deltaTime\n   */\n  exec (deltaTime: number) {\n    if (this.running) {\n      this.stack.forEach(cb => cb(deltaTime));\n    }\n  }\n}\n"
+      },
+      {
+        "filename": "index.ts",
+        "lang": "typescript",
+        "data": "import System from './system';\nimport { IEntity, Entity } from './entity';\nimport { Ecs } from './main';\nimport { ECS_STATUS, ENTITY_EVENTS } from './const';\nimport { IComponent } from './component';\nimport { EventEmitter } from './game-hook';\n\nexport {\n  IComponent,\n  ECS_STATUS,\n  ENTITY_EVENTS,\n  EventEmitter,\n  Entity,\n  System,\n  Ecs,\n}\n\nexport type IEntity<T> = IEntity<T>;\n"
+      },
+      {
+        "filename": "main.ts",
+        "lang": "typescript",
+        "data": "import System from './system';\nimport GameLoop from './game-loop';\nimport { hook } from './game-hook';\nimport { ECS_STATUS } from './const';\n\nclass EcsCore {\n  /** 游戏循环 */\n  private looper: GameLoop = new GameLoop();\n  /** 游戏系统列表 */\n  private systems: System[] = [];\n  /** 游戏勾子 */\n  public hook = hook;\n  /** 游戏运行状态 */\n  public status: string = ECS_STATUS.STOPPED;\n\n  constructor () {\n    this.looper.add(this.updateSystem.bind(this));\n  }\n\n  /**\n   * 添加系统\n   * @param system\n   */\n  addSystem (system: System) {\n    if (this.systems.find(sys => sys.name === system.name)) return;\n    this.systems.push(system);\n  }\n\n  /**\n   * 移除系统\n   */\n  removeSystem (system: System | string) {\n    const idx = typeof system === 'string'\n      ? this.systems.findIndex(sys => sys.name === system )\n      : this.systems.findIndex(sys => sys.name === system.name);\n    if (idx > -1) {\n      this.systems.splice(idx, 1);\n    }\n  }\n\n  /**\n   * 更新系统\n   * @param deltaTime\n   */\n  updateSystem (deltaTime: number) {\n    // 第一遍帧更新\n    for (let sys of this.systems) {\n      sys.traverse(deltaTime);\n    }\n    // 第二遍等全部系统帧更新结束后再次更新\n    for (let sys of this.systems) {\n      sys.lastUpdated();\n    }\n  }\n\n  /**\n   * 切换游戏状态\n   * @param looperStart\n   * @param gameStatus\n   */\n  private changeGameStatus (looperStart: boolean, gameStatus: string) {\n    if (this.status === gameStatus) return;\n    if (looperStart) {\n      this.looper.start();\n    } else {\n      this.looper.stop();\n    }\n    this.hook.emit(gameStatus);\n    this.status = gameStatus;\n  }\n\n  /**\n   * 开始游戏\n   */\n  start () {\n    this.changeGameStatus(true, ECS_STATUS.RUNNING);\n  }\n\n  /**\n   * 暂停游戏\n   */\n  pause () {\n    this.changeGameStatus(false, ECS_STATUS.PAUSED);\n  }\n\n  /**\n   * 恢复游戏\n   */\n  resume () {\n    this.changeGameStatus(true, ECS_STATUS.RUNNING);\n  }\n\n  /**\n   * 停止游戏\n   */\n  stop () {\n    this.changeGameStatus(false, ECS_STATUS.STOPPED);\n  }\n\n  /**\n   * 更新游戏\n   * @param deltaTime\n   */\n  update (deltaTime: number) {\n    this.looper.exec(deltaTime);\n  }\n}\n\nlet ecs: EcsCore;\n\nexport function Ecs (): EcsCore {\n  if (!ecs) ecs = new EcsCore();\n  return ecs;\n}\n"
+      },
+      {
+        "filename": "system.ts",
+        "lang": "typescript",
+        "data": "import { Entity } from './entity';\nimport entityManager from './entity-manager';\nimport { hook } from './game-hook';\n\nexport default class System {\n  protected entities: Entity[] = [];\n  public name: string;\n  public hook = hook;\n\n  /**\n   * 创建系统\n   * ----\n   * 通常情况下，系统会遍历所有的实体，当你配置过滤器后，系统只会遍历包含特定组件的实体\n   * @param name 系统名称\n   * @param componentFilter 组件过滤器\n   */\n  constructor (name: string, componentFilter?: string[]) {\n    this.name = name;\n    // 初始化索引\n    if (!componentFilter || !componentFilter.length) {\n      this.entities = entityManager.entities;\n    } else {\n      const key = entityManager.getIndexName(componentFilter);\n      this.entities = entityManager.getIndexList(key);\n      hook.on(key, this.onListChanged.bind(this));\n    }\n  }\n\n  /**\n   * 遍历实体\n   * @param deltaTime\n   */\n  public traverse (deltaTime: number) {\n    this.entities.forEach((e, idx) => this.update(e, idx, deltaTime));\n  }\n\n  /**\n   * 帧更新\n   * @param entity \n   * @param index \n   * @param deltaTime \n   */\n  public update (entity: Entity, index: number, deltaTime: number) { };\n\n  /**\n   * 全部系统更新结束时调用\n   */\n  public lastUpdated () { };\n\n  /**\n   * 当遍历列表发生变化时触发，如某个Entity被添加或移除\n   * @param action 添加 | 删除\n   * @param entity 对应事件的Entity\n   */\n  public onListChanged (action: 'add' | 'remove', entity: Entity) { };\n}\n"
+      }
+    ]
+  },
+  {
+    "filename": "@extend",
+    "dir": true,
+    "children": [
+      {
+        "filename": "script-manager.ts",
+        "lang": "typescript",
+        "data": "import { EventEmitter } from '../@core';\n\ninterface IScriptOptions {\n  action: (...args: any) => any;\n  eventName?: string;\n  condition?: (...args: any) => boolean;\n  autoStart?: boolean;\n}\n\ninterface IScript extends IScriptOptions {\n  // disabled?: boolean;\n  actionWithCondition?: (...args: any) => any;\n}\n\nclass ScriptManager extends EventEmitter {\n  private scripts: {\n    [index: string]: IScript\n  } = {};\n\n  use (scriptName: string, ...args: any) {\n    const script = this.scripts[scriptName];\n    if (script) {\n      script.action(...args);\n    }\n  }\n\n  register (scriptName: string, scriptOptions: IScriptOptions) {\n    if (this.scripts[scriptName]) {\n      console.error(`Duplicate Script: ${scriptName} with options:`, scriptOptions);\n      return;\n    }\n    const { eventName, condition, autoStart } = scriptOptions;\n    const script: IScript = { ...scriptOptions };\n    // Event.\n    if (eventName) {\n      if (condition) {\n        script.actionWithCondition = () => condition && script.action();\n        this.on(eventName, script.actionWithCondition);\n      } else {\n        this.on(eventName, script.action);\n      }\n    }\n    // AutoStart.\n    if (autoStart) {\n      script.action();\n    }\n    // Registered.\n    this.scripts[scriptName] = script;\n  }\n\n  unregister (scriptName: string) {\n    const script = this.scripts[scriptName];\n    if (!script) return;\n    const { eventName, condition, action, actionWithCondition } = script;\n    if (eventName) {\n      this.off(eventName, condition ? actionWithCondition : action);\n    }\n    delete this.scripts[scriptName];\n  }\n}\n\nconst scriptManager = new ScriptManager();\n\nexport default scriptManager;\n"
+      }
+    ]
+  },
+  {
+    "filename": "components",
+    "dir": true,
+    "children": [
+      {
+        "filename": "movement.ts",
+        "lang": "typescript",
+        "data": "import { IComponent } from '../@core';\n\ninterface IOptions {\n  speed?: number[];\n  size?: number;\n}\n\nexport default class Movement implements IComponent {\n  name = 'movement';\n\n  /**\n   * 速度 [x, y, z]\n   */\n  speed = [0, 0, 0];\n\n  /**\n   * 碰撞体积\n   */\n  size = 0;\n\n  constructor (option?: IOptions) {\n    if (option) Object.assign(this, option);\n  }\n}"
+      },
+      {
+        "filename": "sprite.ts",
+        "lang": "typescript",
+        "data": "import { IComponent } from '../@core';\n\nexport default class Sprite implements IComponent {\n  name = 'sprite'\n\n  /** \n   * 渲染对象\n   */\n  object: THREE.Object3D | null;\n\n  constructor (obj: THREE.Object3D) {\n    this.object = obj;\n  }\n}\n"
+      }
+    ]
+  },
+  {
+    "filename": "scripts",
+    "dir": true,
+    "children": [
+      {
+        "filename": "init.ts",
+        "lang": "typescript",
+        "data": "import { Entity } from '../@core';\nimport { GAME_SCRIPT_NAME, GAME_WORLD_STATUS, GAME_DATA } from '../const';\nimport scriptManager from '../@extend/script-manager';\nimport Sprite from '../components/sprite';\nimport Movement from '../components/movement';\nimport game from '../game';\nimport getRandomColor from '../utils/get-random-color';\nconst { THREE } = window;\n\nfunction createRoomObject() {\n  const geom = new THREE.BoxGeometry(GAME_DATA.ROOM_SIZE, GAME_DATA.ROOM_SIZE, GAME_DATA.ROOM_SIZE);\n  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });\n  material.opacity = 0.5;\n  material.transparent = true;\n  const cube = new THREE.Mesh(geom, material);\n  return cube;\n}\n\nfunction createBallObject (size: number) {\n  // With Random Color\n  const geom = new THREE.SphereGeometry(size, 16, 16);\n  const material = new THREE.MeshBasicMaterial({ color: getRandomColor() });\n  const ball = new THREE.Mesh(geom, material);\n  return ball;\n}\n\nfunction createBall (index: number) {\n  const ball = new Entity('ball_' + index);\n  const size = Math.floor(Math.random() * GAME_DATA.BALL_SIZE_RANGE + 8);\n  const speed = [Math.random() * 2, Math.random() * 2, Math.random() * 2];\n  ball.addComponent(new Sprite(createBallObject(size)));\n  ball.addComponent(new Movement({ speed, size }));\n  return ball;\n}\n\nfunction InitAction() {\n  // Create a room entity & Add to the world.\n  const room = new Entity('room');\n  room.addComponent(new Sprite(createRoomObject()));\n  game.world.add(room);\n\n  // Create Balls\n  for (let i = 0; i < GAME_DATA.BALL_NUM; i++) {\n    setTimeout(() => room.add(createBall(i)), i * 600);\n  }\n}\n\nexport default scriptManager.register(\n  GAME_SCRIPT_NAME.INIT,\n  {\n    eventName: GAME_WORLD_STATUS.START,\n    action: InitAction\n  }\n)"
+      }
+    ]
+  },
+  {
+    "filename": "systems",
+    "dir": true,
+    "children": [
+      {
+        "filename": "collision.ts",
+        "lang": "typescript",
+        "data": "import { System, IEntity } from '../@core';\nimport Sprite from '../components/sprite';\nimport Movement from '../components/movement';\nimport { GAME_DATA } from '../const';\n\ntype TriggeredEntity = IEntity<{\n  sprite: Sprite;\n  movement: Movement;\n}>;\n\nclass CollisionSystem extends System {\n  constructor () {\n    super('CollisionSystem', ['sprite', 'movement']);\n  }\n\n  update (entity: TriggeredEntity) {\n    // Check Wall.\n    const { x, y, z } = entity.component.sprite.object!.position;\n    const { speed, size } = entity.component.movement;\n    this.hasHitWall(size, x, 0, speed);\n    this.hasHitWall(size, y, 1, speed);\n    this.hasHitWall(size, z, 2, speed);\n  }\n\n  hasHitWall (size: number, value: number, index: number, arr: number[]) {\n    const threshold = GAME_DATA.ROOM_SIZE / 2 - size;\n    if (value >= threshold || value <= (0 - threshold)) {\n      arr[index] = 0 - arr[index];\n    }\n  }\n\n  isCollided (e1: TriggeredEntity, e2: TriggeredEntity) {\n    const { x: x1, y: y1, z: z1 } = e1.component.sprite.object!.position;\n    const { x: x2, y: y2, z: z2 } = e2.component.sprite.object!.position;\n    const d = Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2);\n    const minD = Math.pow(e1.component.movement.size + e2.component.movement.size, 2);\n    if (d <= minD) {\n      const swap = e1.component.movement.speed;\n      e1.component.movement.speed = e2.component.movement.speed;\n      e2.component.movement.speed = swap;\n    }\n  }\n\n  lastUpdated () {\n    // Check Balls.\n    for (let i = 0, len = this.entities.length; i < len; i++) {\n      const selectedEntity = this.entities[i] as TriggeredEntity;\n      for (let j = i + 1; j < len; j++) {\n        const comparedEntity = this.entities[j] as TriggeredEntity;\n        this.isCollided(selectedEntity, comparedEntity);\n      }\n    }\n  }\n}\n\nexport default new CollisionSystem();\n"
+      },
+      {
+        "filename": "movement.ts",
+        "lang": "typescript",
+        "data": "import { System, IEntity } from '../@core';\nimport Movement from '../components/movement';\nimport Sprite from '../components/sprite';\n\ntype TriggeredEntity = IEntity<{\n  sprite: Sprite;\n  movement: Movement;\n}>\n\nclass MovementSystem extends System {\n  constructor () {\n    super('MovementSystem', ['movement', 'sprite']);\n  }\n\n  update (entity: TriggeredEntity, index: number, deltaTime: number) {\n    const { sprite, movement } = entity.component;\n    const { object } = sprite;\n    if (!object) return;\n    const { x, y, z } = object.position;\n    const [ dx, dy, dz ] = movement.speed;\n    object.position.set(\n      x + dx * deltaTime,\n      y + dy * deltaTime,\n      z + dz * deltaTime\n    );\n  }\n}\n\nexport default new MovementSystem();\n"
+      },
+      {
+        "filename": "render.ts",
+        "lang": "typescript",
+        "data": "import { System, ENTITY_EVENTS, IEntity } from '../@core';\nimport Game from '../game';\nimport Sprite from '../components/sprite';\n\ntype TriggeredEntity = IEntity<{ sprite: Sprite }>\n\nclass RenderSystem extends System {\n  constructor () {\n    super('RenderSystem', ['sprite']);\n    this.bindEvents();\n  }\n\n  bindEvents () {\n    this.hook.on(ENTITY_EVENTS.ADD, this.renderObject.bind(null, 'add'));\n    this.hook.on(ENTITY_EVENTS.REMOVE, this.renderObject.bind(null, 'remove'));\n  }\n\n  renderObject (action: 'add' | 'remove', parent: TriggeredEntity, child: TriggeredEntity) {\n    const s1 = parent.component.sprite;\n    const s2 = child.component.sprite;\n    if (!s1 || !s2 || !s1.object || !s2.object) return;\n    if (action === 'add') {\n      s1.object.add(s2.object);\n    } else {\n      s1.object.remove(s2.object);\n    }\n  }\n\n  lastUpdated () {\n    Game.render();\n  }\n}\n\nexport default new RenderSystem();\n"
+      }
+    ]
+  },
+  {
+    "filename": "utils",
+    "dir": true,
+    "children": [
+      {
+        "filename": "get-random-color.ts",
+        "lang": "typescript",
+        "data": "export default function getRandomColor () {\n  return Math.floor(Math.random() * 0xffffff);\n}"
+      }
+    ]
+  },
+  {
+    "filename": "const.ts",
+    "lang": "typescript",
+    "data": "export const GAME_WORLD_STATUS = {\n  START: 'gw_status_start'\n}\n\nexport const GAME_SCRIPT_NAME = {\n  INIT: 'g_script_init'\n}\n\nexport const GAME_DATA = {\n  FPS: 60,\n  ROOM_SIZE: 200,\n  CAMERA_DISTANCE: 300,\n  BALL_NUM: 8,\n  BALL_SIZE_RANGE: 10\n}"
+  },
+  {
+    "filename": "game.ts",
+    "lang": "typescript",
+    "data": "import { Entity, Ecs } from './@core';\nimport Sprite from './components/sprite';\nimport scriptManager from './@extend/script-manager';\nimport RenderSystem from './systems/render';\nimport { GAME_WORLD_STATUS, GAME_DATA } from './const';\nimport MovementSystem from './systems/movement';\nimport CollisionSystem from './systems/collision';\nconst { THREE } = window;\n\n// GAME\nclass Game {\n  private renderer = new THREE.WebGLRenderer();\n  public scene = new THREE.Scene();\n  public camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);\n  public helper = new (THREE as any).OrbitControls(this.camera, this.renderer.domElement );\n  public world = new Entity('GameWorld');\n  public app = Ecs();\n\n  constructor () {\n    this.world.addComponent(new Sprite(this.scene));\n    this.bindEvents();\n    this.load();\n  }\n\n  bindEvents () {\n    window.onload = () => {\n      document.querySelector('.canvas')!.appendChild(this.renderer.domElement);\n      this.setSize();\n      window.requestAnimationFrame(animate);\n    };\n\n    const mask = document.getElementById('mask')!;\n    let sto: NodeJS.Timeout | null = null;\n    window.onresize = () => {\n      if (sto) clearTimeout(sto);\n      mask.style.display = 'block';\n      sto = setTimeout(() => {\n        this.setSize();\n        mask.style.display = 'none';\n        sto = null;\n      }, 500);\n    }\n  }\n\n  setSize () {\n    const cvs = document.querySelector('.canvas')!\n    const { width, height } = cvs.getBoundingClientRect();\n    this.camera.aspect = width / height;\n    this.camera.updateProjectionMatrix();\n    this.renderer.setSize(width, height);\n  }\n\n  load () {\n    // Load Systems\n    this.app.addSystem(RenderSystem);\n    this.app.addSystem(MovementSystem);\n    this.app.addSystem(CollisionSystem);\n    // Adjust Camera Position.\n    this.camera.position.set(0, 0, GAME_DATA.CAMERA_DISTANCE);\n    this.helper.update();\n  }\n\n  start () {\n    this.app.start();\n    scriptManager.emit(GAME_WORLD_STATUS.START);\n  }\n\n  render () {\n    this.helper.update();\n    this.renderer.render(this.scene, this.camera);\n  }\n}\n\nconst game = new Game();\n\n// GAME_OPTIONS\nconst FPS = 1000 / GAME_DATA.FPS;\n\n// VARS\nlet lastTime = performance.now();\nlet deltaTime = 0;\n\n// FUNCTIONS\nfunction animate (currentTime: number) {\n  window.requestAnimationFrame(animate);\n  deltaTime = currentTime - lastTime;\n  if (deltaTime > FPS) {\n    game.app.update(deltaTime / FPS);\n    lastTime = currentTime;\n  }\n}\n\nexport default game;\n"
+  },
+  {
+    "filename": "global.d.ts",
+    "lang": "typescript",
+    "data": "import * as THREE_DEF from 'three';\n\ndeclare global {\n  interface Window {\n    THREE: typeof THREE_DEF;\n  }\n}\n"
+  },
+  {
+    "filename": "index.ts",
+    "lang": "typescript",
+    "data": "import game from './game';\nimport CodeViewer from 'my-code-viewer';\nimport 'my-code-viewer/dist/style.css?raw';\nimport './scripts/init';\n\n// init code viewer.\nconst viewer = new CodeViewer();\ndocument.getElementById('app')!.appendChild(viewer.rootNode);\n\n// get files.\nconst xhr = new XMLHttpRequest();\nxhr.open('get', 'files.json');\nxhr.responseType = 'json';\nxhr.onreadystatechange = function () {\n  if (xhr.readyState === 4) {\n    viewer.loadFiles(xhr.response);\n  }\n}\nxhr.send();\n\n// start Game.\ngame.start();\n"
+  }
+]

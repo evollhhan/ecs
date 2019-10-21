@@ -1,42 +1,51 @@
 import { IComponent } from './component';
 import entityManager from './entity-manager';
+import { hook } from './game-hook';
+import { ENTITY_EVENTS } from './const';
 
 type TComponentList = {
   [index: string]: IComponent | any;
 }
 
-export default class Entity {
-  public component: TComponentList = Object.create(null);
+export interface IEntity<T> extends Entity {
+  component: T;
+}
+
+export class Entity {
   public id: string;
+  public component: TComponentList = Object.create(null);
+  public children: Entity[] = [];
   
   /**
-   * 创建实体 
    * @param id 实体ID
    */
   constructor (id: string) {
     this.id = id;
   }
 
-  /**
-   * 获取组件名称列表
-   */
+  add (entity: Entity) {
+    this.children.push(entity);
+    hook.emit(ENTITY_EVENTS.ADD, this, entity);
+  }
+
+  remove (entity: Entity) {
+    this.children = this.children.filter(e => e !== entity);
+    hook.emit(ENTITY_EVENTS.REMOVE, this, entity);
+  }
+
   getComponentNames (): string[] {
     return Object.keys(this.component).sort();
   }
 
-  /**
-   * 添加组件
-   * @param component 组件
-   */
+  getComponent<T> (componentName: string): T | null | undefined {
+    return this.component[componentName];
+  }
+
   addComponent (component: IComponent) {
     this.component[component.name] = component;
     entityManager.updateIndexList('add', this, component.name);
   }
 
-  /**
-   * 移除组件
-   * @param component 组件
-   */
   removeComponent (component: IComponent) {
     delete this.component[component.name];
     entityManager.updateIndexList('remove', this, component.name);

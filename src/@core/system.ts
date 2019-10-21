@@ -1,10 +1,11 @@
-import Entity from './entity';
+import { Entity } from './entity';
 import entityManager from './entity-manager';
-import { hook } from './hook';
+import { hook } from './game-hook';
 
-export default abstract class System {
-  private entities: Entity[] = [];
+export default class System {
+  protected entities: Entity[] = [];
   public name: string;
+  public hook = hook;
 
   /**
    * 创建系统
@@ -39,7 +40,7 @@ export default abstract class System {
    * @param index 
    * @param deltaTime 
    */
-  public abstract update (entity: Entity, index: number, deltaTime: number): void;
+  public update (entity: Entity, index: number, deltaTime: number) { };
 
   /**
    * 全部系统更新结束时调用

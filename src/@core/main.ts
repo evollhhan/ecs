@@ -1,12 +1,7 @@
-import GameLoop from './game-loop';
 import System from './system';
-import { Hook, hook } from './hook';
-
-export const ECS_STATUS = {
-  STOPPED: 'ecs_status_stopped',
-  RUNNING: 'ecs_status_running',
-  PAUSED:  'ecs_status_paused'
-}
+import GameLoop from './game-loop';
+import { hook } from './game-hook';
+import { ECS_STATUS } from './const';
 
 class EcsCore {
   /** 游戏循环 */
@@ -14,7 +9,7 @@ class EcsCore {
   /** 游戏系统列表 */
   private systems: System[] = [];
   /** 游戏勾子 */
-  public hook: Hook = hook;
+  public hook = hook;
   /** 游戏运行状态 */
   public status: string = ECS_STATUS.STOPPED;
 
