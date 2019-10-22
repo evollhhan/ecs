@@ -138,6 +138,6 @@
   {
     "filename": "index.ts",
     "lang": "typescript",
-    "data": "import game from './game';\nimport CodeViewer from 'my-code-viewer';\nimport 'my-code-viewer/dist/style.css?raw';\nimport './scripts/init';\n\n// init code viewer.\nconst viewer = new CodeViewer();\ndocument.getElementById('app')!.appendChild(viewer.rootNode);\n\n// get files.\nconst xhr = new XMLHttpRequest();\nxhr.open('get', 'files.json');\nxhr.responseType = 'json';\nxhr.onreadystatechange = function () {\n  if (xhr.readyState === 4) {\n    viewer.loadFiles(xhr.response);\n  }\n}\nxhr.send();\n\n// start Game.\ngame.start();\n"
+    "data": "// @ts-ignore\nimport HL from 'my-code-viewer/dist/hl.web';\nimport CodeViewer from 'my-code-viewer';\nimport 'my-code-viewer/dist/hl.web.css?raw';\nimport 'my-code-viewer/dist/main.css?raw';\nimport game from './game';\nimport './scripts/init';\n\n// init code viewer.\nconst viewer = new CodeViewer();\nviewer.useRenderer(HL.highlightBlock);\ndocument.getElementById('app')!.appendChild(viewer.rootNode);\n\n// get files.\nconst xhr = new XMLHttpRequest();\nxhr.open('get', 'files.json');\nxhr.responseType = 'json';\nxhr.onreadystatechange = function () {\n  if (xhr.readyState === 4) {\n    viewer.loadFiles(xhr.response);\n  }\n}\nxhr.send();\n\n// start Game.\ngame.start();\n"
   }
 ]

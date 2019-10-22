@@ -1,10 +1,14 @@
-import game from './game';
+// @ts-ignore
+import HL from 'my-code-viewer/dist/hl.web';
 import CodeViewer from 'my-code-viewer';
-import 'my-code-viewer/dist/style.css?raw';
+import 'my-code-viewer/dist/hl.web.css?raw';
+import 'my-code-viewer/dist/main.css?raw';
+import game from './game';
 import './scripts/init';
 
 // init code viewer.
 const viewer = new CodeViewer();
+viewer.useRenderer(HL.highlightBlock);
 document.getElementById('app')!.appendChild(viewer.rootNode);
 
 // get files.
