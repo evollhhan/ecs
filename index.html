@@ -27,8 +27,24 @@
       height: 100%;
     }
     .canvas {
+      position: relative;
       width: 36vw;
       flex-shrink: 0;
+    }
+    .monitor {
+      position: absolute;
+      padding: 1em;
+      top: 0;
+      width: 100%;
+      height: 120px;
+      color: #fff;
+      text-align: right;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    #board::after {
+      content: attr(data-num);
+      margin-left: 4px;
     }
     pre, code {
       font-family: 'fira';
@@ -38,7 +54,11 @@
 <body>
   <div id="mask">resizing</div>
   <div id="app">
-    <div class="canvas"></div>
+    <div class="canvas">
+      <div class="monitor">
+        <div id="board" data-num="0">Actived Ball -></div>
+      </div>
+    </div>
   </div>
   <script src="./three.min.js"></script>
   <script src="./orbitcontrols.js"></script>

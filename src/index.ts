@@ -5,6 +5,7 @@ import 'my-code-viewer/dist/hl.web.css?raw';
 import 'my-code-viewer/dist/main.css?raw';
 import game from './game';
 import './scripts/init';
+import './scripts/add-life';
 
 // init code viewer.
 const viewer = new CodeViewer();
@@ -21,6 +22,9 @@ xhr.onreadystatechange = function () {
   }
 }
 xhr.send();
+
+//@ts-ignore
+window.game = game;
 
 // start Game.
 game.start();

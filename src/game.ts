@@ -5,19 +5,21 @@ import RenderSystem from './systems/render';
 import { GAME_WORLD_STATUS, GAME_DATA } from './const';
 import MovementSystem from './systems/movement';
 import CollisionSystem from './systems/collision';
+import HealthSystem from './systems/health';
+import Ticker from './utils/ticker';
 const { THREE } = window;
 
 // GAME
 class Game {
   private renderer = new THREE.WebGLRenderer();
-  public scene = new THREE.Scene();
-  public camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  public helper = new (THREE as any).OrbitControls(this.camera, this.renderer.domElement );
-  public world = new Entity('GameWorld');
-  public app = Ecs();
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  helper = new (THREE as any).OrbitControls(this.camera, this.renderer.domElement);
+  ticker = new Ticker(GAME_DATA.FPS);
+  world = new Entity('GameWorld');
+  app = Ecs();
 
   constructor () {
-    this.world.addComponent(new Sprite(this.scene));
     this.bindEvents();
     this.load();
   }
@@ -26,8 +28,19 @@ class Game {
     window.onload = () => {
       document.querySelector('.canvas')!.appendChild(this.renderer.domElement);
       this.setSize();
-      window.requestAnimationFrame(animate);
     };
+
+    document.addEventListener('visibilitychange', () => {
+      const state = document.visibilityState;
+      if (state === 'hidden') {
+        this.ticker.stop();
+        this.app.pause();
+      }
+      else if (state === 'visible') {
+        this.ticker.start();
+        this.app.resume();
+      }
+    });
 
     const mask = document.getElementById('mask')!;
     let sto: NodeJS.Timeout | null = null;
@@ -40,6 +53,8 @@ class Game {
         sto = null;
       }, 500);
     }
+
+    this.ticker.handler = this.app.update.bind(this.app);
   }
 
   setSize () {
@@ -53,15 +68,19 @@ class Game {
   load () {
     // Load Systems
     this.app.addSystem(RenderSystem);
-    this.app.addSystem(MovementSystem);
+    this.app.addSystem(HealthSystem);
     this.app.addSystem(CollisionSystem);
+    this.app.addSystem(MovementSystem);
     // Adjust Camera Position.
     this.camera.position.set(0, 0, GAME_DATA.CAMERA_DISTANCE);
     this.helper.update();
+    // Create World.
+    this.world.addComponent(new Sprite(this.scene));
   }
 
   start () {
     this.app.start();
+    this.ticker.start();
     scriptManager.emit(GAME_WORLD_STATUS.START);
   }
 
@@ -71,23 +90,4 @@ class Game {
   }
 }
 
-const game = new Game();
-
-// GAME_OPTIONS
-const FPS = 1000 / GAME_DATA.FPS;
-
-// VARS
-let lastTime = performance.now();
-let deltaTime = 0;
-
-// FUNCTIONS
-function animate (currentTime: number) {
-  window.requestAnimationFrame(animate);
-  deltaTime = currentTime - lastTime;
-  if (deltaTime > FPS) {
-    game.app.update(deltaTime / FPS);
-    lastTime = currentTime;
-  }
-}
-
-export default game;
+export default new Game();;

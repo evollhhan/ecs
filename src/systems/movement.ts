@@ -16,13 +16,11 @@ class MovementSystem extends System {
     const { sprite, movement } = entity.component;
     const { object } = sprite;
     if (!object) return;
-    const { x, y, z } = object.position;
-    const [ dx, dy, dz ] = movement.speed;
-    object.position.set(
-      x + dx * deltaTime,
-      y + dy * deltaTime,
-      z + dz * deltaTime
-    );
+    const { speed, pos } = movement;
+    pos[0] = pos[0] + speed[0] * deltaTime;
+    pos[1] = pos[1] + speed[1] * deltaTime;
+    pos[2] = pos[2] + speed[2] * deltaTime;
+    object.position.set(pos[0], pos[1], pos[2]);
   }
 }
 

@@ -35,7 +35,13 @@ export default class System {
   }
 
   /**
-   * 帧更新
+   * 固定帧更新
+   * @param deltaTime
+   */
+  public FixedUpdate (deltaTime: number) { };
+
+  /**
+   * 正常帧更新
    * @param entity 
    * @param index 
    * @param deltaTime 

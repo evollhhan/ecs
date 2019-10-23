@@ -46,8 +46,8 @@ export class Entity {
     entityManager.updateIndexList('add', this, component.name);
   }
 
-  removeComponent (component: IComponent) {
-    delete this.component[component.name];
-    entityManager.updateIndexList('remove', this, component.name);
+  removeComponent (componentName: string) {
+    delete this.component[componentName];
+    entityManager.updateIndexList('remove', this, componentName);
   }
 }
