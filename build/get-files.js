@@ -5,8 +5,8 @@ const fileSearcher = require('my-code-viewer/tools/file-searcher');
 const resolve = url => path.resolve(__dirname, '../', url);
 const baseURL = resolve('');
 const src = resolve('src');
-const static = resolve('static');
+const docs = resolve('docs');
 
 fs.readdir(src, (err, files) => {
-  fileSearcher.makeList(files, src).toFile(static, 'files.json');
+  fileSearcher.makeList(files, src).toFile(docs, 'files.json');
 });

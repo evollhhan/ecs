@@ -33,7 +33,7 @@ module.exports = (env, argv) => {
       watchOptions: {
         poll: false
       },
-      contentBase: path.join(__dirname, '../static')
+      contentBase: path.join(__dirname, '../docs')
     },
     module: {
       rules: config.rules,

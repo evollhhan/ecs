@@ -4,7 +4,7 @@
   "description": "a javascript entity-component-system framework",
   "scripts": {
     "dev": "webpack-dev-server --mode development --inline --progress --config build/dev.js",
-    "build": "NODE_ENV=production node build/build.js",
+    "build-doc": "NODE_ENV=production node build/build-doc.js",
     "get-files": "node build/get-files.js"
   },
   "repository": {
@@ -30,6 +30,7 @@
     "css-loader": "^3.2.0",
     "friendly-errors-webpack-plugin": "^1.7.0",
     "html-webpack-plugin": "^3.2.0",
+    "mini-css-extract-plugin": "^0.8.0",
     "my-code-viewer": "^1.0.1",
     "node-sass": "^4.12.0",
     "ora": "^1.2.0",
